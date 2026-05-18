@@ -28,9 +28,6 @@
     .purple-glow {
       background: linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%);
     }
-    .sage-glow {
-      background: linear-gradient(135deg, #a3b899 0%, #7aa372 100%);
-    }
     .input-reset {
       background: #f3f4f6;
       border: none;
@@ -38,527 +35,519 @@
       transition: all 0.2s;
     }
     .input-reset:focus { background: #e5e7eb; }
-    .bar-col {
-      border-radius: 6px 6px 0 0;
-      background: linear-gradient(to top, #c4b5fd, #8b5cf6);
-      width: 100%;
-      transform-origin: bottom;
-    }
     .hide-scrollbar::-webkit-scrollbar { display: none; }
     .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .btn-press:active { transform: scale(0.96); }
+    .sync-badge { animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
   </style>
 </head>
 <body class="text-gray-800 antialiased">
 
-  <!-- ========== HEADER ========== -->
   <header class="sticky top-0 z-40 glass px-4 py-3 flex items-center justify-between">
     <div class="flex items-center gap-3">
-      <div class="w-8 h-8 rounded-lg purple-glow flex items-center justify-center text-white font-bold text-sm">CB</div>
+      <div class="w-8 h-8 rounded-lg purple-glow flex items-center justify-center text-white font-bold text-sm relative">
+        CB
+        <span id="syncDot" class="absolute -top-1 -right-1 w-3 h-3 bg-emerald-400 rounded-full border-2 border-white hidden sync-badge"></span>
+      </div>
       <div>
         <h1 class="font-bold text-gray-900 leading-tight text-sm">Dashboard</h1>
-        <p class="text-[10px] text-gray-500 leading-tight">Track college expenses</p>
+        <p class="text-[10px] text-gray-500 leading-tight" id="syncStatus">Local only</p>
       </div>
     </div>
-    <button id="addBtn" class="bg-gray-900 text-white px-4 py-2 rounded-full text-sm font-medium active:scale-95 transition-transform">
-      + Add Expense
-    </button>
+    <div class="flex gap-2">
+      <button onclick="openModal('goalModal')" class="bg-white border border-gray-200 text-gray-700 px-3 py-2 rounded-full text-xs font-medium btn-press hidden sm:block">+ Goal</button>
+      <button onclick="openModal('billModal')" class="bg-gray-900 text-white px-4 py-2 rounded-full text-sm font-medium btn-press">+ Add Bill</button>
+    </div>
   </header>
 
-  <!-- ========== MAIN GRID ========== -->
   <main class="p-4 pb-24 max-w-6xl mx-auto space-y-4">
 
-    <!-- ROW 1: Monthly Overview + Budget Status -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-
-      <!-- MONTHLY OVERVIEW (spans 2) -->
       <div class="lg:col-span-2 glass rounded-3xl p-5 card-anim">
         <div class="flex justify-between items-center mb-4">
-          <h2 class="font-semibold text-gray-700 text-sm uppercase tracking-wide">Monthly Overview</h2>
-          <span class="text-xs bg-gray-200 px-2 py-1 rounded-md text-gray-600" id="currentMonth">May 2026</span>
+          <h2 class="font-semibold text-gray-700 text-sm uppercase tracking-wide">Financial Overview</h2>
+          <button onclick="openModal('balanceModal')" class="text-xs text-purple-600 font-medium hover:text-purple-800 btn-press flex items-center gap-1">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+            Edit Balance
+          </button>
         </div>
-
         <div class="grid grid-cols-3 gap-3 mb-5">
-          <div class="bg-white rounded-2xl p-3 shadow-sm">
-            <p class="text-[10px] text-gray-500 mb-1">Spent This Month</p>
-            <p class="text-xl font-bold text-gray-900" id="spentDisplay">$0</p>
+          <div class="bg-white rounded-2xl p-3 shadow-sm relative overflow-hidden">
+            <p class="text-[10px] text-gray-500 mb-1">Total Balance</p>
+            <p class="text-xl font-bold text-gray-900" id="balanceDisplay">$0</p>
+            <div class="absolute top-0 right-0 w-16 h-16 bg-purple-100 rounded-full -mr-8 -mt-8 opacity-40"></div>
           </div>
-          <div class="bg-white rounded-2xl p-3 shadow-sm">
-            <p class="text-[10px] text-gray-500 mb-1">Budget Left</p>
-            <p class="text-xl font-bold text-emerald-600" id="leftDisplay">$0</p>
+          <div class="bg-white rounded-2xl p-3 shadow-sm relative overflow-hidden">
+            <p class="text-[10px] text-gray-500 mb-1">Total Bills</p>
+            <p class="text-xl font-bold text-red-500" id="billsDisplay">$0</p>
+            <div class="absolute top-0 right-0 w-16 h-16 bg-red-100 rounded-full -mr-8 -mt-8 opacity-40"></div>
           </div>
-          <div class="dark-glass rounded-2xl p-3">
-            <p class="text-[10px] text-gray-400 mb-1">Projected Semester</p>
-            <p class="text-xl font-bold text-white" id="projectedDisplay">$0</p>
+          <div class="dark-glass rounded-2xl p-3 relative overflow-hidden">
+            <p class="text-[10px] text-gray-400 mb-1">Surplus</p>
+            <p class="text-xl font-bold" id="surplusDisplay">$0</p>
           </div>
         </div>
-
-        <!-- CSS Bar Chart -->
         <div class="bg-white rounded-2xl p-4 shadow-sm">
           <div class="flex justify-between text-[10px] text-gray-400 mb-2">
-            <span>Spending Trend (Last 7 Days)</span>
+            <span>Balance Allocation</span>
+            <span id="allocationText">Bills 0% • Goals 0% • Free 100%</span>
           </div>
-          <div class="h-28 flex items-end justify-between gap-2" id="barChart">
-            <!-- Bars injected by JS -->
+          <div class="h-3 bg-gray-100 rounded-full overflow-hidden flex">
+            <div id="barBills" class="h-full bg-red-400 transition-all duration-700" style="width:0%"></div>
+            <div id="barGoals" class="h-full bg-purple-400 transition-all duration-700" style="width:0%"></div>
+            <div id="barFree" class="h-full bg-emerald-400 transition-all duration-700" style="width:100%"></div>
+          </div>
+          <div class="flex justify-between mt-2 text-[10px]">
+            <div class="flex items-center gap-1"><div class="w-2 h-2 rounded-full bg-red-400"></div><span class="text-gray-500">Bills</span></div>
+            <div class="flex items-center gap-1"><div class="w-2 h-2 rounded-full bg-purple-400"></div><span class="text-gray-500">Goals</span></div>
+            <div class="flex items-center gap-1"><div class="w-2 h-2 rounded-full bg-emerald-400"></div><span class="text-gray-500">Free Cash</span></div>
           </div>
         </div>
       </div>
 
-      <!-- BUDGET STATUS -->
       <div class="dark-glass rounded-3xl p-5 card-anim flex flex-col justify-between">
         <h2 class="font-semibold text-sm uppercase tracking-wide text-gray-300 mb-4">Budget Status</h2>
-        
         <div class="grid grid-cols-2 gap-3 mb-4">
           <div class="purple-glow rounded-2xl p-3 text-white">
-            <p class="text-[10px] text-purple-100 mb-1">Days Left</p>
-            <p class="text-3xl font-bold" id="daysLeft">0</p>
+            <p class="text-[10px] text-purple-100 mb-1">Bills to Pay</p>
+            <p class="text-3xl font-bold" id="billCount">0</p>
           </div>
           <div class="bg-emerald-500/20 border border-emerald-500/30 rounded-2xl p-3">
-            <p class="text-[10px] text-emerald-200 mb-1">Daily Budget</p>
-            <p class="text-3xl font-bold text-emerald-300" id="dailyBudget">$0</p>
+            <p class="text-[10px] text-emerald-200 mb-1">Free Cash</p>
+            <p class="text-3xl font-bold" id="freeCashDisplay">$0</p>
           </div>
         </div>
-
         <div class="bg-white/10 rounded-2xl p-3">
           <div class="flex justify-between text-xs mb-2">
-            <span class="text-gray-300">Monthly Progress</span>
-            <span class="text-white font-medium" id="progressText">0%</span>
+            <span class="text-gray-300">Goal Progress</span>
+            <span class="text-white font-medium" id="goalProgressText">0%</span>
           </div>
           <div class="h-2 bg-white/20 rounded-full overflow-hidden">
-            <div id="progressBar" class="h-full bg-purple-400 rounded-full" style="width: 0%"></div>
+            <div id="goalProgressBar" class="h-full bg-purple-400 rounded-full transition-all duration-700" style="width: 0%"></div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- ROW 2: Category Chart + Transactions -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-
-      <!-- CATEGORY DONUT -->
       <div class="dark-glass rounded-3xl p-5 card-anim">
-        <h2 class="font-semibold text-sm uppercase tracking-wide text-gray-300 mb-2">Spending by Category</h2>
-        <div class="relative h-48 w-full flex items-center justify-center">
-          <canvas id="categoryChart"></canvas>
-        </div>
-        <div id="categoryLegend" class="mt-3 space-y-2 text-xs">
-          <!-- Legend injected by JS -->
-        </div>
+        <h2 class="font-semibold text-sm uppercase tracking-wide text-gray-300 mb-2">Bills by Category</h2>
+        <div class="relative h-48 w-full flex items-center justify-center"><canvas id="categoryChart"></canvas></div>
+        <div id="categoryLegend" class="mt-3 space-y-2 text-xs"></div>
       </div>
-
-      <!-- RECENT TRANSACTIONS -->
-      <div class="lg:col-span-2 glass rounded-3xl p-5 card-anim">
+      <div class="lg:col-span-2 glass rounded-3xl p-5 card-anim flex flex-col">
         <div class="flex justify-between items-center mb-4">
-          <h2 class="font-semibold text-gray-700 text-sm uppercase tracking-wide">Recent Transactions</h2>
-          <button onclick="exportData()" class="text-xs text-purple-600 font-medium hover:text-purple-800">Export JSON</button>
+          <h2 class="font-semibold text-gray-700 text-sm uppercase tracking-wide">Upcoming Bills</h2>
+          <div class="flex gap-2">
+            <button onclick="exportData()" class="text-xs text-purple-600 font-medium hover:text-purple-800 btn-press">Export JSON</button>
+            <button onclick="openModal('billModal')" class="sm:hidden text-xs bg-gray-900 text-white px-3 py-1.5 rounded-lg btn-press">+ Add</button>
+          </div>
         </div>
-        <div id="transactionList" class="space-y-3 max-h-80 overflow-y-auto hide-scrollbar pr-1">
-          <!-- Transactions injected by JS -->
-        </div>
+        <div id="transactionList" class="space-y-3 max-h-80 overflow-y-auto hide-scrollbar pr-1 flex-1"></div>
       </div>
+    </div>
+
+    <div class="glass rounded-3xl p-5 card-anim">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="font-semibold text-gray-700 text-sm uppercase tracking-wide">Savings Goals</h2>
+        <button onclick="openModal('goalModal')" class="bg-gray-900 text-white px-4 py-2 rounded-full text-xs font-medium btn-press">+ Create Goal</button>
+      </div>
+      <div id="goalsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3"></div>
     </div>
 
   </main>
 
-  <!-- ========== ADD EXPENSE MODAL ========== -->
-  <div id="modal" class="fixed inset-0 z-50 hidden">
-    <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" id="modalBackdrop"></div>
+  <!-- MODALS -->
+  <div id="billModal" class="fixed inset-0 z-50 hidden modal">
+    <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="closeModal('billModal')"></div>
     <div class="absolute inset-0 flex items-end sm:items-center justify-center p-4 pointer-events-none">
-      <div id="modalPanel" class="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl pointer-events-auto transform translate-y-full opacity-0">
+      <div class="modal-panel bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl pointer-events-auto transform translate-y-full opacity-0">
         <div class="flex justify-between items-center mb-5">
-          <h3 class="text-lg font-bold text-gray-900">Add Expense</h3>
-          <button id="closeModal" class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500">✕</button>
+          <h3 class="text-lg font-bold text-gray-900">Add Bill</h3>
+          <button onclick="closeModal('billModal')" class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500">✕</button>
         </div>
-        
-        <form id="expenseForm" class="space-y-4">
-          <div>
-            <label class="text-xs font-medium text-gray-500 mb-1 block">Description</label>
-            <input type="text" id="descInput" class="input-reset w-full rounded-xl px-4 py-3 text-sm" placeholder="e.g. Chipotle, Gas, Textbooks" required>
-          </div>
-          
+        <form id="billForm" class="space-y-4">
+          <div><label class="text-xs font-medium text-gray-500 mb-1 block">Description</label><input type="text" id="billDesc" class="input-reset w-full rounded-xl px-4 py-3 text-sm" placeholder="e.g. Tuition, Rent, Groceries" required></div>
           <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="text-xs font-medium text-gray-500 mb-1 block">Amount ($)</label>
-              <input type="number" id="amountInput" step="0.01" min="0.01" class="input-reset w-full rounded-xl px-4 py-3 text-sm" placeholder="0.00" required>
-            </div>
-            <div>
-              <label class="text-xs font-medium text-gray-500 mb-1 block">Category</label>
-              <select id="catInput" class="input-reset w-full rounded-xl px-4 py-3 text-sm">
-                <option value="food">🍔 Food</option>
-                <option value="transport">🚗 Transport</option>
-                <option value="housing">🏠 Housing</option>
-                <option value="books">📚 Books</option>
-                <option value="fun">🎮 Fun</option>
-                <option value="other">📦 Other</option>
+            <div><label class="text-xs font-medium text-gray-500 mb-1 block">Amount ($)</label><input type="number" id="billAmount" step="0.01" min="0.01" class="input-reset w-full rounded-xl px-4 py-3 text-sm" placeholder="0.00" required></div>
+            <div><label class="text-xs font-medium text-gray-500 mb-1 block">Category</label>
+              <select id="billCat" class="input-reset w-full rounded-xl px-4 py-3 text-sm">
+                <option value="food">🍔 Food</option><option value="tuition">🎓 Tuition</option><option value="hygiene">🧼 Hygiene</option><option value="personal">👤 Personal</option>
+                <option value="transport">🚗 Transport</option><option value="books">📚 Books</option><option value="fun">🎮 Fun</option><option value="other">📦 Other</option>
               </select>
             </div>
           </div>
-
-          <button type="submit" class="w-full bg-gray-900 text-white font-medium py-3 rounded-xl mt-2 active:scale-[0.98] transition-transform">
-            Save Transaction
-          </button>
+          <button type="submit" class="w-full bg-gray-900 text-white font-medium py-3 rounded-xl btn-press">Add to Bills</button>
         </form>
       </div>
     </div>
   </div>
 
-  <!-- ========== JAVASCRIPT ========== -->
+  <div id="balanceModal" class="fixed inset-0 z-50 hidden modal">
+    <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="closeModal('balanceModal')"></div>
+    <div class="absolute inset-0 flex items-end sm:items-center justify-center p-4 pointer-events-none">
+      <div class="modal-panel bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl pointer-events-auto transform translate-y-full opacity-0">
+        <div class="flex justify-between items-center mb-5">
+          <h3 class="text-lg font-bold text-gray-900">Edit Balance</h3>
+          <button onclick="closeModal('balanceModal')" class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500">✕</button>
+        </div>
+        <form id="balanceForm" class="space-y-4">
+          <div><label class="text-xs font-medium text-gray-500 mb-1 block">Current Account Balance</label><input type="number" id="balanceInput" step="0.01" class="input-reset w-full rounded-xl px-4 py-3 text-sm text-lg font-semibold" placeholder="0.00" required></div>
+          <button type="submit" class="w-full bg-gray-900 text-white font-medium py-3 rounded-xl btn-press">Update Balance</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div id="goalModal" class="fixed inset-0 z-50 hidden modal">
+    <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="closeModal('goalModal')"></div>
+    <div class="absolute inset-0 flex items-end sm:items-center justify-center p-4 pointer-events-none">
+      <div class="modal-panel bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl pointer-events-auto transform translate-y-full opacity-0">
+        <div class="flex justify-between items-center mb-5">
+          <h3 class="text-lg font-bold text-gray-900">Create Savings Goal</h3>
+          <button onclick="closeModal('goalModal')" class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500">✕</button>
+        </div>
+        <form id="goalForm" class="space-y-4">
+          <div><label class="text-xs font-medium text-gray-500 mb-1 block">Goal Name</label><input type="text" id="goalName" class="input-reset w-full rounded-xl px-4 py-3 text-sm" placeholder="e.g. Spring Break, New Laptop" required></div>
+          <div><label class="text-xs font-medium text-gray-500 mb-1 block">Target Amount ($)</label><input type="number" id="goalTarget" step="0.01" min="0.01" class="input-reset w-full rounded-xl px-4 py-3 text-sm" placeholder="0.00" required></div>
+          <button type="submit" class="w-full bg-gray-900 text-white font-medium py-3 rounded-xl btn-press">Create Goal</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div id="contributeModal" class="fixed inset-0 z-50 hidden modal">
+    <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="closeModal('contributeModal')"></div>
+    <div class="absolute inset-0 flex items-end sm:items-center justify-center p-4 pointer-events-none">
+      <div class="modal-panel bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl pointer-events-auto transform translate-y-full opacity-0">
+        <div class="flex justify-between items-center mb-5">
+          <h3 class="text-lg font-bold text-gray-900">Contribute to Goal</h3>
+          <button onclick="closeModal('contributeModal')" class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500">✕</button>
+        </div>
+        <form id="contributeForm" class="space-y-4">
+          <input type="hidden" id="contributeGoalId">
+          <div class="bg-purple-50 rounded-xl p-3 mb-2"><p class="text-xs text-purple-600 mb-1">Goal</p><p class="font-semibold text-gray-900" id="contributeGoalName">--</p></div>
+          <div><label class="text-xs font-medium text-gray-500 mb-1 block">Amount to Add ($)</label><input type="number" id="contributeAmount" step="0.01" min="0.01" class="input-reset w-full rounded-xl px-4 py-3 text-sm" placeholder="0.00" required></div>
+          <p class="text-xs text-gray-400" id="contributeHint">Available surplus: $0</p>
+          <button type="submit" class="w-full bg-gray-900 text-white font-medium py-3 rounded-xl btn-press">Add Money</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <script type="module">
     // ======================
-    // CONFIG
+    // FIREBASE CONFIG — YOURS
     // ======================
-    const BUDGET = 1200; // ← Change this to your monthly budget
-    const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
-    
+    const firebaseConfig = {
+      apiKey: "AIzaSyAfaAK92BrwJrn0WelnIrrhRIsLMdfnlLE",
+      authDomain: "calyx-budget.firebaseapp.com",
+      projectId: "calyx-budget",
+      storageBucket: "calyx-budget.firebasestorage.app",
+      messagingSenderId: "180399837757",
+      appId: "1:180399837757:web:360a4c6db7d99da5001054",
+      measurementId: "G-9RHRBRX3GZ"
+    };
+
+    const HAS_FIREBASE = !!firebaseConfig.apiKey;
+
     // ======================
     // STATE
     // ======================
-    let transactions = [];
+    const CAT_COLORS = { food:'#8b5cf6', tuition:'#f472b6', hygiene:'#60a5fa', personal:'#fbbf24', transport:'#a3b899', books:'#f87171', fun:'#34d399', other:'#9ca3af' };
+    const CAT_LABELS = { food:'Food', tuition:'Tuition', hygiene:'Hygiene', personal:'Personal', transport:'Transport', books:'Books', fun:'Fun', other:'Other' };
+    const GOAL_COLORS = ['#8b5cf6','#34d399','#f472b6','#fbbf24','#60a5fa','#a3b899'];
+    const EMOJIS = { food:'🍔', tuition:'🎓', hygiene:'🧼', personal:'👤', transport:'🚗', books:'📚', fun:'🎮', other:'📦' };
+
+    let state = { balance: 0, bills: [], goals: [] };
     let chartInstance = null;
-    
-    // Load from localStorage
-    const raw = localStorage.getItem('calyx_budget_v1');
-    if (raw) {
-      try { transactions = JSON.parse(raw); } catch(e) {}
+    let db = null, userId = null;
+
+    // ======================
+    // LOCAL STORAGE FALLBACK
+    // ======================
+    function loadLocal() {
+      const raw = localStorage.getItem('calyx_budget_v2');
+      if (raw) try { state = { balance: 0, bills: [], goals: [], ...JSON.parse(raw) }; } catch(e) {}
     }
-    
+    function saveLocal() { localStorage.setItem('calyx_budget_v2', JSON.stringify(state)); }
+
     // ======================
-    // FIREBASE (OPTIONAL - Fill in to enable sync)
+    // FIREBASE INIT
     // ======================
-    const FIREBASE_CONFIG = {
-      // apiKey: "YOUR_API_KEY",
-      // authDomain: "YOUR_PROJECT.firebaseapp.com",
-      // projectId: "YOUR_PROJECT_ID",
-    };
-    
-    let db = null;
-    let userId = null;
-    
-    if (FIREBASE_CONFIG.apiKey) {
+    if (HAS_FIREBASE) {
       const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js');
-      const { getFirestore, collection, addDoc, query, orderBy, onSnapshot } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
+      const { getFirestore, doc, setDoc, onSnapshot } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
       const { getAuth, signInAnonymously } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
-      
-      const app = initializeApp(FIREBASE_CONFIG);
+
+      const app = initializeApp(firebaseConfig);
       db = getFirestore(app);
       const auth = getAuth(app);
       const cred = await signInAnonymously(auth);
       userId = cred.user.uid;
-      
-      // Real-time sync from Firebase
-      const q = query(collection(db, 'users', userId, 'transactions'), orderBy('timestamp', 'desc'));
-      onSnapshot(q, snap => {
-        if (snap.empty) return;
-        transactions = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        saveLocal();
-        render();
+
+      onSnapshot(doc(db, 'users', userId), snap => {
+        if (snap.exists()) {
+          const data = snap.data();
+          state = { balance: data.balance || 0, bills: data.bills || [], goals: data.goals || [] };
+          saveLocal();
+          render(false);
+          showSyncStatus(true);
+        }
       });
+
+      showSyncStatus(true);
+    } else {
+      loadLocal();
+      showSyncStatus(false);
     }
-    
-    function saveLocal() {
-      localStorage.setItem('calyx_budget_v1', JSON.stringify(transactions));
+
+    function showSyncStatus(connected) {
+      const dot = document.getElementById('syncDot');
+      const txt = document.getElementById('syncStatus');
+      if (connected) {
+        dot.classList.remove('hidden');
+        txt.textContent = 'Synced across devices';
+        txt.className = 'text-[10px] text-emerald-600 leading-tight font-medium';
+      } else {
+        dot.classList.add('hidden');
+        txt.textContent = 'Local only — no sync';
+        txt.className = 'text-[10px] text-gray-500 leading-tight';
+      }
     }
-    
+
+    async function pushToCloud() {
+      saveLocal();
+      if (HAS_FIREBASE && db && userId) {
+        const { setDoc, doc } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
+        await setDoc(doc(db, 'users', userId), state);
+      }
+    }
+
     // ======================
-    // RENDER ENGINE
+    // RENDER
     // ======================
-    function render() {
-      const now = new Date();
-      const currentMonthStr = `${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}`;
-      document.getElementById('currentMonth').textContent = currentMonthStr;
-      
-      // Filter to current month
-      const thisMonth = transactions.filter(t => {
-        const d = new Date(t.timestamp);
-        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-      });
-      
-      const spent = thisMonth.reduce((s, t) => s + t.amount, 0);
-      const left = Math.max(0, BUDGET - spent);
-      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-      const daysLeft = Math.max(0, daysInMonth - now.getDate());
-      const daily = daysLeft > 0 ? (left / daysLeft) : 0;
-      const projected = spent * (daysInMonth / Math.max(1, now.getDate())) * 4; // semester guess
-      
-      // Animate numbers
-      animateMoney('spentDisplay', spent);
-      animateMoney('leftDisplay', left);
-      animateMoney('projectedDisplay', projected);
-      animateNumber('daysLeft', daysLeft);
-      animateMoney('dailyBudget', daily);
-      
-      // Progress bar
-      const pct = Math.min(100, (spent / BUDGET) * 100);
-      document.getElementById('progressText').textContent = Math.round(pct) + '%';
-      anime({
-        targets: '#progressBar',
-        width: pct + '%',
-        easing: 'easeOutQuart',
-        duration: 1000
-      });
-      
-      // Bar chart (last 7 days)
-      renderBarChart();
-      
-      // Donut chart
+    function render(animate = true) {
+      const totalBills = state.bills.reduce((s, b) => s + b.amount, 0);
+      const totalGoalsSaved = state.goals.reduce((s, g) => s + g.saved, 0);
+      const surplus = state.balance - totalBills;
+      const freeCash = surplus - totalGoalsSaved;
+      const totalGoalTarget = state.goals.reduce((s, g) => s + g.target, 0);
+
+      document.getElementById('surplusDisplay').className = `text-xl font-bold ${surplus < 0 ? 'text-red-400' : 'text-emerald-400'}`;
+      document.getElementById('freeCashDisplay').className = `text-3xl font-bold ${freeCash < 0 ? 'text-red-300' : 'text-emerald-300'}`;
+
+      if (animate) {
+        animateMoney('balanceDisplay', state.balance);
+        animateMoney('billsDisplay', totalBills);
+        animateMoney('surplusDisplay', surplus);
+        animateNumber('billCount', state.bills.length);
+        animateMoney('freeCashDisplay', freeCash);
+      } else {
+        setText('balanceDisplay', state.balance);
+        setText('billsDisplay', totalBills, true);
+        setText('surplusDisplay', surplus);
+        document.getElementById('billCount').textContent = state.bills.length;
+        setText('freeCashDisplay', freeCash);
+      }
+
+      const bal = state.balance || 1;
+      const wBills = Math.min(100, (totalBills / bal) * 100);
+      const wGoals = Math.min(100 - wBills, (totalGoalsSaved / bal) * 100);
+      const wFree = Math.max(0, 100 - wBills - wGoals);
+      document.getElementById('barBills').style.width = wBills + '%';
+      document.getElementById('barGoals').style.width = wGoals + '%';
+      document.getElementById('barFree').style.width = wFree + '%';
+      document.getElementById('allocationText').textContent = `Bills ${Math.round(wBills)}% • Goals ${Math.round(wGoals)}% • Free ${Math.round(wFree)}%`;
+
+      const goalPct = totalGoalTarget > 0 ? Math.min(100, (totalGoalsSaved / totalGoalTarget) * 100) : 0;
+      document.getElementById('goalProgressText').textContent = Math.round(goalPct) + '%';
+      document.getElementById('goalProgressBar').style.width = goalPct + '%';
+
       renderDonut();
-      
-      // Transaction list
-      renderList();
+      renderBills();
+      renderGoals(freeCash);
     }
-    
+
+    function setText(id, val, red = false) {
+      const el = document.getElementById(id);
+      const prefix = val < 0 ? '-$' : '$';
+      el.textContent = prefix + Math.abs(val).toLocaleString('en-US', {maximumFractionDigits: 0});
+      if (red) el.className = 'text-xl font-bold text-red-500';
+    }
+
     function animateMoney(id, target) {
       const el = document.getElementById(id);
-      const current = parseFloat(el.textContent.replace(/[^0-9.]/g, '')) || 0;
-      anime({
-        targets: { val: current },
-        val: target,
-        round: 100,
-        easing: 'easeOutExpo',
-        duration: 1200,
+      const current = parseFloat(el.textContent.replace(/[^0-9.-]/g, '')) || 0;
+      anime({ targets: { val: current }, val: target, round: 100, easing: 'easeOutExpo', duration: 1000,
         update: function(a) {
-          el.textContent = '$' + a.animations[0].currentValue.toLocaleString('en-US', {maximumFractionDigits: 0});
+          const v = a.animations[0].currentValue;
+          el.textContent = (v < 0 ? '-$' : '$') + Math.abs(v).toLocaleString('en-US', {maximumFractionDigits: 0});
         }
       });
     }
-    
     function animateNumber(id, target) {
       const el = document.getElementById(id);
       const current = parseInt(el.textContent) || 0;
-      anime({
-        targets: { val: current },
-        val: target,
-        round: 1,
-        easing: 'easeOutExpo',
-        duration: 1200,
-        update: a => el.textContent = Math.round(a.animations[0].currentValue)
-      });
+      anime({ targets: { val: current }, val: target, round: 1, easing: 'easeOutExpo', duration: 1000, update: a => el.textContent = Math.round(a.animations[0].currentValue) });
     }
-    
-    function renderBarChart() {
-      const container = document.getElementById('barChart');
-      container.innerHTML = '';
-      const days = ['S','M','T','W','T','F','S'];
-      const today = new Date();
-      
-      for (let i = 6; i >= 0; i--) {
-        const d = new Date(today);
-        d.setDate(d.getDate() - i);
-        const daySpent = transactions
-          .filter(t => {
-            const td = new Date(t.timestamp);
-            return td.toDateString() === d.toDateString();
-          })
-          .reduce((s, t) => s + t.amount, 0);
-        
-        const max = BUDGET / 10; // scale factor
-        const h = Math.min(100, (daySpent / max) * 100);
-        const isToday = i === 0;
-        
-        const col = document.createElement('div');
-        col.className = 'flex flex-col items-center flex-1';
-        col.innerHTML = `
-          <div class="w-full relative" style="height: 80px;">
-            <div class="bar-col absolute bottom-0 left-0 right-0" style="height: ${h}%"></div>
-          </div>
-          <span class="text-[10px] mt-1 ${isToday ? 'text-purple-600 font-bold' : 'text-gray-400'}">${days[d.getDay()]}</span>
-        `;
-        container.appendChild(col);
-      }
-      
-      // Animate bars growing
-      anime({
-        targets: '.bar-col',
-        scaleY: [0, 1],
-        easing: 'easeOutBack',
-        duration: 800,
-        delay: anime.stagger(50)
-      });
-    }
-    
+
     function renderDonut() {
-      const now = new Date();
-      const thisMonth = transactions.filter(t => {
-        const d = new Date(t.timestamp);
-        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-      });
-      
-      const cats = { food: 0, transport: 0, housing: 0, books: 0, fun: 0, other: 0 };
-      thisMonth.forEach(t => { cats[t.category] = (cats[t.category] || 0) + t.amount; });
-      
-      const labels = ['Food','Transport','Housing','Books','Fun','Other'];
-      const data = [cats.food, cats.transport, cats.housing, cats.books, cats.fun, cats.other];
-      const colors = ['#8b5cf6', '#60a5fa', '#a3b899', '#f472b6', '#fbbf24', '#9ca3af'];
-      
+      const cats = {};
+      state.bills.forEach(b => { cats[b.category] = (cats[b.category] || 0) + b.amount; });
+      const labels = Object.keys(cats).map(c => CAT_LABELS[c] || c);
+      const data = Object.values(cats);
+      const colors = Object.keys(cats).map(c => CAT_COLORS[c] || '#9ca3af');
       const ctx = document.getElementById('categoryChart').getContext('2d');
-      
       if (chartInstance) chartInstance.destroy();
-      
-      chartInstance = new Chart(ctx, {
-        type: 'doughnut',
-        data: {
-          labels,
-          datasets: [{
-            data,
-            backgroundColor: colors,
-            borderWidth: 0,
-            hoverOffset: 4
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          cutout: '70%',
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              callbacks: {
-                label: ctx => ' $' + ctx.raw.toFixed(2)
-              }
-            }
-          }
-        }
-      });
-      
-      // Custom legend
-      const leg = document.getElementById('categoryLegend');
-      leg.innerHTML = labels.map((l, i) => `
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <div class="w-2 h-2 rounded-full" style="background:${colors[i]}"></div>
-            <span class="text-gray-300">${l}</span>
-          </div>
-          <span class="text-white font-medium">$${data[i].toFixed(0)}</span>
-        </div>
-      `).join('');
+
+      if (data.length === 0) {
+        chartInstance = new Chart(ctx, { type: 'doughnut', data: { labels: ['No Bills'], datasets: [{ data: [1], backgroundColor: ['#e5e7eb'], borderWidth: 0 }] }, options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { display: false }, tooltip: { enabled: false } } } });
+        document.getElementById('categoryLegend').innerHTML = `<div class="text-center text-gray-500 text-xs py-4">No bills added yet</div>`;
+        return;
+      }
+      chartInstance = new Chart(ctx, { type: 'doughnut', data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 0, hoverOffset: 4 }] }, options: { responsive: true, maintainAspectRatio: false, cutout: '70%', plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ' $' + ctx.raw.toFixed(2) } } } } });
+      document.getElementById('categoryLegend').innerHTML = Object.keys(cats).map(c => `<div class="flex items-center justify-between"><div class="flex items-center gap-2"><div class="w-2 h-2 rounded-full" style="background:${CAT_COLORS[c]}"></div><span class="text-gray-300">${CAT_LABELS[c] || c}</span></div><span class="text-white font-medium">$${cats[c].toFixed(0)}</span></div>`).join('');
     }
-    
-    function renderList() {
+
+    function renderBills() {
       const list = document.getElementById('transactionList');
-      const sorted = [...transactions].sort((a, b) => b.timestamp - a.timestamp).slice(0, 20);
-      
-      const emojis = { food: '🍔', transport: '🚗', housing: '🏠', books: '📚', fun: '🎮', other: '📦' };
-      const catLabels = { food: 'Food', transport: 'Transport', housing: 'Housing', books: 'Books', fun: 'Fun', other: 'Other' };
-      
-      list.innerHTML = sorted.map((t, i) => `
-        <div class="flex items-center justify-between p-3 bg-white rounded-2xl shadow-sm border border-gray-100 list-item" data-index="${i}">
+      const sorted = [...state.bills].sort((a, b) => b.timestamp - a.timestamp);
+      if (sorted.length === 0) { list.innerHTML = `<div class="text-center py-8 text-gray-400 text-sm">No bills yet. Add your tuition, rent, etc.</div>`; return; }
+      list.innerHTML = sorted.map(b => `
+        <div class="flex items-center justify-between p-3 bg-white rounded-2xl shadow-sm border border-gray-100 group">
           <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-full bg-purple-50 flex items-center justify-center text-lg">
-              ${emojis[t.category] || '📦'}
-            </div>
-            <div>
-              <p class="font-medium text-gray-800 text-sm">${t.desc}</p>
-              <p class="text-[10px] text-gray-500">${catLabels[t.category] || t.category} • ${new Date(t.timestamp).toLocaleDateString()}</p>
-            </div>
+            <div class="w-10 h-10 rounded-full flex items-center justify-center text-lg" style="background:${CAT_COLORS[b.category]}20"><span style="color:${CAT_COLORS[b.category]}">${EMOJIS[b.category] || '📦'}</span></div>
+            <div><p class="font-medium text-gray-800 text-sm">${escapeHtml(b.desc)}</p><p class="text-[10px] text-gray-500">${CAT_LABELS[b.category] || b.category} • ${new Date(b.timestamp).toLocaleDateString()}</p></div>
           </div>
-          <p class="font-semibold text-red-500 text-sm">-$${t.amount.toFixed(2)}</p>
-        </div>
-      `).join('');
-      
-      if (sorted.length === 0) {
-        list.innerHTML = `<div class="text-center py-8 text-gray-400 text-sm">No transactions yet. Add one!</div>`;
-      }
+          <div class="flex items-center gap-3">
+            <p class="font-semibold text-red-500 text-sm">-$${b.amount.toFixed(2)}</p>
+            <button onclick="deleteBill('${b.id}')" class="w-8 h-8 rounded-full bg-red-50 text-red-500 flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity btn-press" title="Delete bill">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+            </button>
+          </div>
+        </div>`).join('');
     }
-    
-    // ======================
-    // MODAL & FORM
-    // ======================
-    const modal = document.getElementById('modal');
-    const panel = document.getElementById('modalPanel');
-    const addBtn = document.getElementById('addBtn');
-    const closeBtn = document.getElementById('closeModal');
-    const backdrop = document.getElementById('modalBackdrop');
-    
-    function openModal() {
+
+    function escapeHtml(text) { const div = document.createElement('div'); div.textContent = text; return div.innerHTML; }
+
+    window.deleteBill = async function(id) {
+      if (!confirm('Delete this bill?')) return;
+      state.bills = state.bills.filter(b => b.id !== id);
+      await pushToCloud();
+      render();
+    };
+
+    function renderGoals(freeCash) {
+      const grid = document.getElementById('goalsGrid');
+      if (state.goals.length === 0) { grid.innerHTML = `<div class="col-span-full text-center py-6 text-gray-400 text-sm border-2 border-dashed border-gray-200 rounded-2xl">No savings goals yet. Create one to start stashing cash.</div>`; return; }
+      grid.innerHTML = state.goals.map((g, i) => {
+        const pct = Math.min(100, (g.saved / g.target) * 100);
+        const color = GOAL_COLORS[i % GOAL_COLORS.length];
+        const complete = g.saved >= g.target;
+        return `<div class="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 relative group ${complete ? 'ring-2 ring-emerald-400' : ''}">
+          <button onclick="deleteGoal('${g.id}')" class="absolute top-2 right-2 w-6 h-6 rounded-full bg-gray-100 text-gray-400 flex items-center justify-center opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity btn-press" title="Delete goal">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+          <div class="flex items-center gap-2 mb-3"><div class="w-3 h-3 rounded-full" style="background:${color}"></div><h3 class="font-semibold text-gray-800 text-sm truncate pr-4">${escapeHtml(g.name)}</h3>${complete ? '<span class="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-md font-medium">DONE</span>' : ''}</div>
+          <div class="flex justify-between items-end mb-2"><div><p class="text-[10px] text-gray-500">Saved</p><p class="text-lg font-bold text-gray-900">$${g.saved.toFixed(0)}</p></div><div class="text-right"><p class="text-[10px] text-gray-500">Target</p><p class="text-sm font-medium text-gray-600">$${g.target.toFixed(0)}</p></div></div>
+          <div class="h-2 bg-gray-100 rounded-full overflow-hidden mb-3"><div class="h-full rounded-full transition-all duration-700" style="width:${pct}%; background:${color}"></div></div>
+          <button onclick="openContribute('${g.id}')" class="w-full py-2 rounded-xl text-xs font-medium text-white btn-press ${complete ? 'bg-gray-300 cursor-not-allowed' : ''}" style="background:${complete ? '#d1d5db' : color}" ${complete ? 'disabled' : ''}>${complete ? 'Goal Reached' : '+ Add Money'}</button>
+        </div>`;
+      }).join('');
+    }
+
+    window.deleteGoal = async function(id) {
+      if (!confirm('Delete this goal? Saved money returns to surplus.')) return;
+      state.goals = state.goals.filter(g => g.id !== id);
+      await pushToCloud();
+      render();
+    };
+
+    window.openContribute = function(id) {
+      const g = state.goals.find(x => x.id === id);
+      if (!g || g.saved >= g.target) return;
+      document.getElementById('contributeGoalId').value = id;
+      document.getElementById('contributeGoalName').textContent = g.name;
+      const totalBills = state.bills.reduce((s, b) => s + b.amount, 0);
+      const totalGoalsSaved = state.goals.reduce((s, g) => s + g.saved, 0);
+      const freeCash = (state.balance - totalBills) - totalGoalsSaved;
+      document.getElementById('contributeHint').textContent = `Available surplus: $${Math.max(0, freeCash).toFixed(2)}`;
+      document.getElementById('contributeAmount').value = '';
+      openModal('contributeModal');
+    };
+
+    window.openModal = function(id) {
+      const modal = document.getElementById(id);
+      const panel = modal.querySelector('.modal-panel');
       modal.classList.remove('hidden');
-      anime({
-        targets: panel,
-        translateY: ['100%', '0%'],
-        opacity: [0, 1],
-        easing: 'easeOutBack',
-        duration: 400
-      });
-      document.getElementById('descInput').focus();
-    }
-    
-    function closeModal() {
-      anime({
-        targets: panel,
-        translateY: '100%',
-        opacity: 0,
-        easing: 'easeInBack',
-        duration: 300,
-        complete: () => modal.classList.add('hidden')
-      });
-    }
-    
-    addBtn.addEventListener('click', openModal);
-    closeBtn.addEventListener('click', closeModal);
-    backdrop.addEventListener('click', closeModal);
-    
-    document.getElementById('expenseForm').addEventListener('submit', async (e) => {
+      anime({ targets: panel, translateY: ['100%', '0%'], opacity: [0, 1], easing: 'easeOutBack', duration: 400 });
+    };
+    window.closeModal = function(id) {
+      const modal = document.getElementById(id);
+      const panel = modal.querySelector('.modal-panel');
+      anime({ targets: panel, translateY: '100%', opacity: 0, easing: 'easeInBack', duration: 300, complete: () => modal.classList.add('hidden') });
+    };
+
+    document.getElementById('billForm').addEventListener('submit', async e => {
       e.preventDefault();
-      const t = {
-        id: crypto.randomUUID(),
-        desc: document.getElementById('descInput').value,
-        amount: parseFloat(document.getElementById('amountInput').value),
-        category: document.getElementById('catInput').value,
-        timestamp: Date.now()
-      };
-      
-      transactions.push(t);
-      saveLocal();
-      
-      // Sync to Firebase if configured
-      if (db && userId) {
-        const { addDoc, collection } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
-        await addDoc(collection(db, 'users', userId, 'transactions'), t);
-      }
-      
-      closeModal();
+      state.bills.push({ id: crypto.randomUUID(), desc: document.getElementById('billDesc').value, amount: parseFloat(document.getElementById('billAmount').value), category: document.getElementById('billCat').value, timestamp: Date.now() });
+      await pushToCloud();
+      closeModal('billModal');
       e.target.reset();
       render();
-      
-      // Flash animation on new transaction
-      setTimeout(() => {
-        const first = document.querySelector('.list-item');
-        if (first) {
-          anime({
-            targets: first,
-            translateX: [20, 0],
-            opacity: [0, 1],
-            easing: 'easeOutExpo',
-            duration: 600
-          });
-        }
-      }, 100);
     });
-    
-    // ======================
-    // ENTRANCE ANIMATIONS
-    // ======================
-    window.addEventListener('DOMContentLoaded', () => {
-      anime({
-        targets: '.card-anim',
-        translateY: [30, 0],
-        opacity: [0, 1],
-        delay: anime.stagger(120),
-        easing: 'easeOutExpo',
-        duration: 900
-      });
-      
+
+    document.getElementById('balanceForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      state.balance = parseFloat(document.getElementById('balanceInput').value);
+      await pushToCloud();
+      closeModal('balanceModal');
       render();
     });
-    
-    // ======================
-    // EXPORT
-    // ======================
+
+    document.getElementById('goalForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      state.goals.push({ id: crypto.randomUUID(), name: document.getElementById('goalName').value, target: parseFloat(document.getElementById('goalTarget').value), saved: 0 });
+      await pushToCloud();
+      closeModal('goalModal');
+      e.target.reset();
+      render();
+    });
+
+    document.getElementById('contributeForm').addEventListener('submit', async e => {
+      e.preventDefault();
+      const id = document.getElementById('contributeGoalId').value;
+      const amt = parseFloat(document.getElementById('contributeAmount').value);
+      const g = state.goals.find(x => x.id === id);
+      if (!g || amt <= 0) return;
+      const totalBills = state.bills.reduce((s, b) => s + b.amount, 0);
+      const totalGoalsSaved = state.goals.reduce((s, g) => s + g.saved, 0);
+      const freeCash = (state.balance - totalBills) - totalGoalsSaved;
+      if (amt > freeCash) { alert('Not enough surplus!'); return; }
+      g.saved = Math.min(g.target, g.saved + amt);
+      await pushToCloud();
+      closeModal('contributeModal');
+      e.target.reset();
+      render();
+    });
+
     window.exportData = function() {
-      const blob = new Blob([JSON.stringify(transactions, null, 2)], {type: 'application/json'});
+      const blob = new Blob([JSON.stringify(state, null, 2)], {type: 'application/json'});
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `budget-backup-${new Date().toISOString().split('T')[0]}.json`;
+      a.download = `calyx-backup-${new Date().toISOString().split('T')[0]}.json`;
       a.click();
     };
+
+    window.addEventListener('DOMContentLoaded', () => {
+      if (!HAS_FIREBASE) render();
+      document.getElementById('balanceInput').value = state.balance || '';
+      anime({ targets: '.card-anim', translateY: [30, 0], opacity: [0, 1], delay: anime.stagger(100), easing: 'easeOutExpo', duration: 900 });
+      if (!HAS_FIREBASE && state.balance === 0 && state.bills.length === 0) setTimeout(() => openModal('balanceModal'), 900);
+    });
   </script>
 </body>
 </html>
