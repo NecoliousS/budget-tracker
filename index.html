@@ -38,7 +38,8 @@
         <p class="text-[10px] text-gray-500 leading-tight" id="syncStatus">Local only</p>
       </div>
     </div>
-    <div class="flex gap-2">
+    <div class="flex gap-2 items-center">
+      <button id="signInBtn" onclick="signInWithGoogle()" class="bg-white border border-gray-200 text-gray-700 px-3 py-2 rounded-full text-xs font-medium btn-press hidden">Sign In</button>
       <button onclick="openModal('goalModal')" class="bg-white border border-gray-200 text-gray-700 px-3 py-2 rounded-full text-xs font-medium btn-press hidden sm:block">+ Goal</button>
       <button onclick="openModal('billModal')" class="bg-gray-900 text-white px-4 py-2 rounded-full text-sm font-medium btn-press">+ Add Bill</button>
     </div>
@@ -156,11 +157,19 @@
             <div><label class="text-xs font-medium text-gray-500 mb-1 block">Amount ($)</label><input type="number" id="billAmount" step="0.01" min="0.01" class="input-reset w-full rounded-xl px-4 py-3 text-sm" placeholder="0.00" required></div>
             <div><label class="text-xs font-medium text-gray-500 mb-1 block">Due Date</label><input type="date" id="billDeadline" class="input-reset w-full rounded-xl px-4 py-3 text-sm" required></div>
           </div>
-          <div><label class="text-xs font-medium text-gray-500 mb-1 block">Category</label>
-            <select id="billCat" class="input-reset w-full rounded-xl px-4 py-3 text-sm">
-              <option value="food">🍔 Food</option><option value="tuition">🎓 Tuition</option><option value="hygiene">🧼 Hygiene</option><option value="personal">👤 Personal</option>
-              <option value="transport">🚗 Transport</option><option value="books">📚 Books</option><option value="fun">🎮 Fun</option><option value="other">📦 Other</option>
-            </select>
+          <div class="grid grid-cols-2 gap-3">
+            <div><label class="text-xs font-medium text-gray-500 mb-1 block">Category</label>
+              <select id="billCat" class="input-reset w-full rounded-xl px-4 py-3 text-sm">
+                <option value="food">🍔 Food</option><option value="tuition">🎓 Tuition</option><option value="hygiene">🧼 Hygiene</option><option value="personal">👤 Personal</option>
+                <option value="transport">🚗 Transport</option><option value="books">📚 Books</option><option value="fun">🎮 Fun</option><option value="subscription">🔄 Subscription</option><option value="other">📦 Other</option>
+              </select>
+            </div>
+            <div><label class="text-xs font-medium text-gray-500 mb-1 block">Type</label>
+              <select id="billType" class="input-reset w-full rounded-xl px-4 py-3 text-sm">
+                <option value="one-time">One-time</option>
+                <option value="subscription">Subscription (Monthly)</option>
+              </select>
+            </div>
           </div>
           <button type="submit" class="w-full bg-gray-900 text-white font-medium py-3 rounded-xl btn-press">Add to Bills</button>
         </form>
@@ -239,14 +248,16 @@
     // ======================
     // STATE
     // ======================
-    const CAT_COLORS = { food:'#8b5cf6', tuition:'#f472b6', hygiene:'#60a5fa', personal:'#fbbf24', transport:'#a3b899', books:'#f87171', fun:'#34d399', other:'#9ca3af' };
-    const CAT_LABELS = { food:'Food', tuition:'Tuition', hygiene:'Hygiene', personal:'Personal', transport:'Transport', books:'Books', fun:'Fun', other:'Other' };
+    const CAT_COLORS = { food:'#8b5cf6', tuition:'#f472b6', hygiene:'#60a5fa', personal:'#fbbf24', transport:'#a3b899', books:'#f87171', fun:'#34d399', subscription:'#f97316', other:'#9ca3af' };
+    const CAT_LABELS = { food:'Food', tuition:'Tuition', hygiene:'Hygiene', personal:'Personal', transport:'Transport', books:'Books', fun:'Fun', subscription:'Subscription', other:'Other' };
     const GOAL_COLORS = ['#8b5cf6','#34d399','#f472b6','#fbbf24','#60a5fa','#a3b899'];
-    const EMOJIS = { food:'🍔', tuition:'🎓', hygiene:'🧼', personal:'👤', transport:'🚗', books:'📚', fun:'🎮', other:'📦' };
+    const EMOJIS = { food:'🍔', tuition:'🎓', hygiene:'🧼', personal:'👤', transport:'🚗', books:'📚', fun:'🎮', subscription:'🔄', other:'📦' };
+    const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
     let state = { balance: 0, bills: [], goals: [] };
     let chartInstance = null;
     let db = null, userId = null, setDocFn = null, docFn = null;
+    let googleProvider = null;
 
     // ======================
     // LOCAL STORAGE
@@ -263,26 +274,49 @@
     async function initFirebase() {
       const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js');
       const { getFirestore, doc, setDoc, onSnapshot } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
-      const { getAuth, signInAnonymously } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
+      const { getAuth, GoogleAuthProvider, onAuthStateChanged } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
 
       const app = initializeApp(firebaseConfig);
       db = getFirestore(app);
       setDocFn = setDoc;
       docFn = doc;
       const auth = getAuth(app);
-      const cred = await signInAnonymously(auth);
-      userId = cred.user.uid;
+      googleProvider = new GoogleAuthProvider();
 
-      onSnapshot(doc(db, 'users', userId), snap => {
-        if (snap.exists()) {
-          const data = snap.data();
-          state = { balance: data.balance || 0, bills: data.bills || [], goals: data.goals || [] };
-          saveLocal();
-          render(false);
+      // Listen for auth state changes
+      onAuthStateChanged(auth, user => {
+        if (user) {
+          userId = user.uid;
+          document.getElementById('signInBtn').classList.add('hidden');
+          showSyncStatus(true);
+          
+          // Start listening to user's data
+          onSnapshot(doc(db, 'users', userId), snap => {
+            if (snap.exists()) {
+              const data = snap.data();
+              state = { balance: data.balance || 0, bills: data.bills || [], goals: data.goals || [] };
+              saveLocal();
+              render(false);
+            }
+          });
+        } else {
+          userId = null;
+          document.getElementById('signInBtn').classList.remove('hidden');
+          showSyncStatus(false);
         }
-        showSyncStatus(true);
       });
     }
+
+    window.signInWithGoogle = async function() {
+      if (!googleProvider) return;
+      const { getAuth, signInWithPopup } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js');
+      const auth = getAuth();
+      try {
+        await signInWithPopup(auth, googleProvider);
+      } catch (err) {
+        alert('Sign in failed: ' + err.message);
+      }
+    };
 
     function showSyncStatus(connected) {
       const dot = document.getElementById('syncDot');
@@ -293,7 +327,7 @@
         txt.className = 'text-[10px] text-emerald-600 leading-tight font-medium';
       } else {
         dot.classList.add('hidden');
-        txt.textContent = 'Local only — no sync';
+        txt.textContent = 'Local only — tap Sign In to sync';
         txt.className = 'text-[10px] text-gray-500 leading-tight';
       }
     }
@@ -303,6 +337,30 @@
       if (HAS_FIREBASE && db && userId && setDocFn && docFn) {
         await setDocFn(docFn(db, 'users', userId), state);
       }
+    }
+
+    // ======================
+    // DATE FORMATTING
+    // ======================
+    function formatDate(dateStr) {
+      if (!dateStr) return '';
+      const d = new Date(dateStr + 'T00:00:00');
+      if (isNaN(d.getTime())) return '';
+      return `${MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+    }
+
+    function getDeadlineStatus(deadlineStr) {
+      if (!deadlineStr) return { text: 'No deadline', color: 'text-gray-500', bg: '' };
+      const today = new Date(); today.setHours(0,0,0,0);
+      const d = new Date(deadlineStr + 'T00:00:00');
+      if (isNaN(d.getTime())) return { text: 'Invalid date', color: 'text-gray-500', bg: '' };
+      d.setHours(0,0,0,0);
+      const diff = Math.ceil((d - today) / (1000 * 60 * 60 * 24));
+      const dateText = formatDate(deadlineStr);
+      if (diff < 0) return { text: `Overdue • ${dateText}`, color: 'text-red-500', bg: 'bg-red-50' };
+      if (diff === 0) return { text: `Due today • ${dateText}`, color: 'text-orange-600', bg: 'bg-orange-50' };
+      if (diff <= 3) return { text: `Due in ${diff} days • ${dateText}`, color: 'text-orange-500', bg: 'bg-orange-50' };
+      return { text: dateText, color: 'text-gray-500', bg: '' };
     }
 
     // ======================
@@ -395,24 +453,13 @@
     }
 
     // ======================
-    // BILLS LIST (with deadlines)
+    // BILLS LIST
     // ======================
-    function getDeadlineStatus(deadlineStr) {
-      if (!deadlineStr) return { text: '', color: 'text-gray-500', bg: '' };
-      const today = new Date(); today.setHours(0,0,0,0);
-      const d = new Date(deadlineStr); d.setHours(0,0,0,0);
-      const diff = Math.ceil((d - today) / (1000 * 60 * 60 * 24));
-      if (diff < 0) return { text: `Overdue by ${Math.abs(diff)} day${Math.abs(diff)>1?'s':''}`, color: 'text-red-500', bg: 'bg-red-50' };
-      if (diff === 0) return { text: 'Due today', color: 'text-orange-600', bg: 'bg-orange-50' };
-      if (diff <= 3) return { text: `Due in ${diff} day${diff>1?'s':''}`, color: 'text-orange-500', bg: 'bg-orange-50' };
-      return { text: `Due ${d.toLocaleDateString()}`, color: 'text-gray-500', bg: '' };
-    }
-
     function renderBills() {
       const list = document.getElementById('transactionList');
       const sorted = [...state.bills].sort((a, b) => {
-        const da = a.deadline ? new Date(a.deadline) : new Date('2099-01-01');
-        const db = b.deadline ? new Date(b.deadline) : new Date('2099-01-01');
+        const da = a.deadline ? new Date(a.deadline + 'T00:00:00') : new Date('2099-01-01');
+        const db = b.deadline ? new Date(b.deadline + 'T00:00:00') : new Date('2099-01-01');
         return da - db;
       });
 
@@ -423,12 +470,13 @@
 
       list.innerHTML = sorted.map(b => {
         const ds = getDeadlineStatus(b.deadline);
+        const subBadge = b.billType === 'subscription' ? '<span class="text-[10px] bg-orange-100 text-orange-700 px-1.5 py-0.5 rounded-md font-medium ml-1">SUB</span>' : '';
         return `
         <div class="flex items-center justify-between p-3 bg-white rounded-2xl shadow-sm border border-gray-100 group ${ds.bg}">
           <div class="flex items-center gap-3">
             <div class="w-10 h-10 rounded-full flex items-center justify-center text-lg" style="background:${CAT_COLORS[b.category]}20"><span style="color:${CAT_COLORS[b.category]}">${EMOJIS[b.category] || '📦'}</span></div>
             <div>
-              <p class="font-medium text-gray-800 text-sm">${escapeHtml(b.desc)}</p>
+              <p class="font-medium text-gray-800 text-sm">${escapeHtml(b.desc)}${subBadge}</p>
               <p class="text-[10px] ${ds.color} font-medium">${CAT_LABELS[b.category] || b.category} • ${ds.text}</p>
             </div>
           </div>
@@ -513,12 +561,15 @@
     // ======================
     document.getElementById('billForm').addEventListener('submit', async e => {
       e.preventDefault();
+      const deadlineVal = document.getElementById('billDeadline').value;
+      if (!deadlineVal) { alert('Please select a due date'); return; }
       state.bills.push({
         id: crypto.randomUUID(),
         desc: document.getElementById('billDesc').value,
         amount: parseFloat(document.getElementById('billAmount').value),
         category: document.getElementById('billCat').value,
-        deadline: document.getElementById('billDeadline').value,
+        billType: document.getElementById('billType').value,
+        deadline: deadlineVal,
         timestamp: Date.now()
       });
       await pushToCloud();
@@ -581,9 +632,7 @@
         showSyncStatus(false);
       }
 
-      // ALWAYS render on startup — this was the bug
       render();
-
       document.getElementById('balanceInput').value = state.balance || '';
       anime({ targets: '.card-anim', translateY: [30, 0], opacity: [0, 1], delay: anime.stagger(100), easing: 'easeOutExpo', duration: 900 });
 
