@@ -142,7 +142,6 @@
 
   </main>
 
-  <!-- MODALS -->
   <div id="billModal" class="fixed inset-0 z-50 hidden modal">
     <div class="absolute inset-0 bg-black/40 backdrop-blur-sm" onclick="closeModal('billModal')"></div>
     <div class="absolute inset-0 flex items-end sm:items-center justify-center p-4 pointer-events-none">
@@ -231,11 +230,12 @@
 
   <script type="module">
     // ======================
-    // FIREBASE CONFIG
+    // FIREBASE CONFIG — YOUR EXACT CONFIG
     // ======================
     const firebaseConfig = {
       apiKey: "AIzaSyAfaAK92BrwJrn0WelnIrrhRIsLMdfnlLE",
       authDomain: "calyx-budget.firebaseapp.com",
+      databaseURL: "https://calyx-budget-default-rtdb.firebaseio.com",
       projectId: "calyx-budget",
       storageBucket: "calyx-budget.firebasestorage.app",
       messagingSenderId: "180399837757",
@@ -245,9 +245,6 @@
 
     const HAS_FIREBASE = !!firebaseConfig.apiKey;
 
-    // ======================
-    // STATE
-    // ======================
     const CAT_COLORS = { food:'#8b5cf6', tuition:'#f472b6', hygiene:'#60a5fa', personal:'#fbbf24', transport:'#a3b899', books:'#f87171', fun:'#34d399', subscription:'#f97316', other:'#9ca3af' };
     const CAT_LABELS = { food:'Food', tuition:'Tuition', hygiene:'Hygiene', personal:'Personal', transport:'Transport', books:'Books', fun:'Fun', subscription:'Subscription', other:'Other' };
     const GOAL_COLORS = ['#8b5cf6','#34d399','#f472b6','#fbbf24','#60a5fa','#a3b899'];
@@ -259,18 +256,12 @@
     let db = null, userId = null, setDocFn = null, docFn = null;
     let googleProvider = null;
 
-    // ======================
-    // LOCAL STORAGE
-    // ======================
     function loadLocal() {
       const raw = localStorage.getItem('calyx_budget_v2');
       if (raw) try { state = { balance: 0, bills: [], goals: [], ...JSON.parse(raw) }; } catch(e) {}
     }
     function saveLocal() { localStorage.setItem('calyx_budget_v2', JSON.stringify(state)); }
 
-    // ======================
-    // FIREBASE INIT
-    // ======================
     async function initFirebase() {
       const { initializeApp } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js');
       const { getFirestore, doc, setDoc, onSnapshot } = await import('https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js');
@@ -283,14 +274,11 @@
       const auth = getAuth(app);
       googleProvider = new GoogleAuthProvider();
 
-      // Listen for auth state changes
       onAuthStateChanged(auth, user => {
         if (user) {
           userId = user.uid;
           document.getElementById('signInBtn').classList.add('hidden');
           showSyncStatus(true);
-          
-          // Start listening to user's data
           onSnapshot(doc(db, 'users', userId), snap => {
             if (snap.exists()) {
               const data = snap.data();
@@ -314,7 +302,8 @@
       try {
         await signInWithPopup(auth, googleProvider);
       } catch (err) {
-        alert('Sign in failed: ' + err.message);
+        console.error('Sign in error:', err);
+        alert('Sign in failed: ' + err.message + '\n\nMake sure:\n1. Google Sign-In is enabled in Firebase Auth\n2. Your domain is authorized\n3. Firestore database exists');
       }
     };
 
@@ -339,9 +328,6 @@
       }
     }
 
-    // ======================
-    // DATE FORMATTING
-    // ======================
     function formatDate(dateStr) {
       if (!dateStr) return '';
       const d = new Date(dateStr + 'T00:00:00');
@@ -363,9 +349,6 @@
       return { text: dateText, color: 'text-gray-500', bg: '' };
     }
 
-    // ======================
-    // RENDER ENGINE
-    // ======================
     function render(animate = true) {
       const totalBills = state.bills.reduce((s, b) => s + b.amount, 0);
       const totalGoalsSaved = state.goals.reduce((s, g) => s + g.saved, 0);
@@ -431,9 +414,6 @@
       anime({ targets: { val: current }, val: target, round: 1, easing: 'easeOutExpo', duration: 1000, update: a => el.textContent = Math.round(a.animations[0].currentValue) });
     }
 
-    // ======================
-    // DONUT CHART
-    // ======================
     function renderDonut() {
       const cats = {};
       state.bills.forEach(b => { cats[b.category] = (cats[b.category] || 0) + b.amount; });
@@ -452,9 +432,6 @@
       document.getElementById('categoryLegend').innerHTML = Object.keys(cats).map(c => `<div class="flex items-center justify-between"><div class="flex items-center gap-2"><div class="w-2 h-2 rounded-full" style="background:${CAT_COLORS[c]}"></div><span class="text-gray-300">${CAT_LABELS[c] || c}</span></div><span class="text-white font-medium">$${cats[c].toFixed(0)}</span></div>`).join('');
     }
 
-    // ======================
-    // BILLS LIST
-    // ======================
     function renderBills() {
       const list = document.getElementById('transactionList');
       const sorted = [...state.bills].sort((a, b) => {
@@ -499,9 +476,6 @@
       render();
     };
 
-    // ======================
-    // GOALS
-    // ======================
     function renderGoals(freeCash) {
       const grid = document.getElementById('goalsGrid');
       if (state.goals.length === 0) { grid.innerHTML = `<div class="col-span-full text-center py-6 text-gray-400 text-sm border-2 border-dashed border-gray-200 rounded-2xl">No savings goals yet. Create one to start stashing cash.</div>`; return; }
@@ -541,9 +515,6 @@
       openModal('contributeModal');
     };
 
-    // ======================
-    // MODALS
-    // ======================
     window.openModal = function(id) {
       const modal = document.getElementById(id);
       const panel = modal.querySelector('.modal-panel');
@@ -556,9 +527,6 @@
       anime({ targets: panel, translateY: '100%', opacity: 0, easing: 'easeInBack', duration: 300, complete: () => modal.classList.add('hidden') });
     };
 
-    // ======================
-    // FORMS
-    // ======================
     document.getElementById('billForm').addEventListener('submit', async e => {
       e.preventDefault();
       const deadlineVal = document.getElementById('billDeadline').value;
@@ -621,9 +589,6 @@
       a.click();
     };
 
-    // ======================
-    // INIT
-    // ======================
     window.addEventListener('DOMContentLoaded', async () => {
       if (HAS_FIREBASE) {
         try { await initFirebase(); } catch(err) { console.error('Firebase init failed:', err); loadLocal(); showSyncStatus(false); }
